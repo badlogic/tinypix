@@ -1,7 +1,7 @@
 {
   "version": 3,
-  "sources": [],
-  "sourcesContent": [],
-  "mappings": "",
+  "sources": ["../src/ui.ts", "../src/tinypix.ts"],
+  "sourcesContent": ["async function loadImage(url: string): Promise<HTMLImageElement> {\n\treturn new Promise<HTMLImageElement>((resolve, reject) => {\n\t\tlet img = new Image();\n\t\timg.onload = () => resolve(img);\n\t\timg.onerror = reject;\n\t\timg.src = url;\n\t});\n}\n\nexport async function initUI(canvas: HTMLCanvasElement, ctx: CanvasRenderingContext2D) {\n\tloadImage(\"/sprite.png\").then((img) => {\n\t\talert(`${img.width}x${img.height}`);\n\t}).catch(() => {\n\t\talert(\"Couldn't load UI assets.\");\n\t});\n}", "import { initUI } from \"./ui\";\n\nfunction init() {\n\tlet canvas = document.getElementById(\"screen\") as HTMLCanvasElement;\n\tlet ctx = canvas.getContext(\"2d\");\n\tif (ctx != null) initUI(canvas, ctx);\n}\n\ninit();"],
+  "mappings": ";;AAAA,2BAAyB,KAAwC;AAChE,WAAO,IAAI,QAA0B,CAAC,SAAS,WAAW;AACzD,UAAI,MAAM,IAAI;AACd,UAAI,SAAS,MAAM,QAAQ;AAC3B,UAAI,UAAU;AACd,UAAI,MAAM;AAAA;AAAA;AAIZ,wBAA6B,QAA2B,KAA+B;AACtF,cAAU,eAAe,KAAK,CAAC,QAAQ;AACtC,YAAM,GAAG,IAAI,SAAS,IAAI;AAAA,OACxB,MAAM,MAAM;AACd,YAAM;AAAA;AAAA;;;ACXR,kBAAgB;AACf,QAAI,SAAS,SAAS,eAAe;AACrC,QAAI,MAAM,OAAO,WAAW;AAC5B,QAAI,OAAO;AAAM,aAAO,QAAQ;AAAA;AAGjC;",
   "names": []
 }

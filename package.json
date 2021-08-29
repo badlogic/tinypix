@@ -4,8 +4,8 @@
   "description": "A terrible web-based pixel editor.",
   "main": "index.js",
   "scripts": {
-    "dev": "concurrently \"npm run build -- --watch\" \"npx live-server dist\"",
-    "build": "npx esbuild src/tinypix.ts --bundle --minify --sourcemap --outfile=dist/index.js"
+    "dev": "concurrently \"npm run build -- --watch\" \"npx live-server --no-browser dist\"",
+    "build": "npx esbuild src/tinypix.ts --bundle --sourcemap --outfile=dist/index.js"
   },
   "repository": {
     "type": "git",
