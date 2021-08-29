@@ -1,0 +1,35 @@
+{
+  "name": "tinypix",
+  "version": "1.0.0",
+  "description": "A terrible web-based pixel editor.",
+  "main": "index.js",
+  "scripts": {
+    "dev": "concurrently \"npm run build -- --watch\" \"npx live-server dist\"",
+    "build": "npx esbuild src/tinypix.ts --bundle --minify --sourcemap --outfile=dist/index.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/badlogic/tinypix.git"
+  },
+  "keywords": [
+    "2d",
+    "pixel",
+    "art",
+    "game",
+    "development",
+    "gamedev"
+  ],
+  "author": "badlogic",
+  "license": "BSD-3-Clause",
+  "bugs": {
+    "url": "https://github.com/badlogic/tinypix/issues"
+  },
+  "homepage": "https://github.com/badlogic/tinypix#readme",
+  "devDependencies": {
+    "concurrently": "^6.2.1",
+    "esbuild": "^0.12.24",
+    "live-server": "^1.2.1",
+    "npx": "^10.2.2",
+    "typescript": "^4.4.2"
+  }
+}
