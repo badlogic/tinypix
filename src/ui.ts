@@ -7,14 +7,28 @@ function loadImage(url: string): Promise<HTMLImageElement> {
 	});
 }
 
+interface EventMouse {
+	type: "down" | "moved" | "dragged" | "up";
+	x: number,
+	y: number
+}
+
+type UIEvent = EventMouse;
+
 interface View {
 	x: number, y: number, width: number, height: number;
+
+	event(event: UIEvent): boolean;
 	layout(): void;
 	draw(ctx: CanvasRenderingContext2D): void;
 }
 
 class BaseView implements View {
 	constructor (public x: number, public y: number, public width: number, public height: number) {
+	}
+
+	event(event: UIEvent): boolean {
+		throw new Error("Method not implemented.");
 	}
 
 	layout() {
@@ -30,6 +44,10 @@ class BaseView implements View {
 class Button extends BaseView {
 	constructor (x: number, y: number, width: number, height: number, public color: string) {
 		super(x, y, width, height);
+	}
+
+	event(event: UIEvent): boolean {
+		return false;
 	}
 
 	layout() { }
@@ -52,6 +70,10 @@ class VStack extends BaseView {
 		this.views.push(view);
 		this.layout();
 		return this;
+	}
+
+	event(ev: UIEvent): boolean {
+		return false;
 	}
 
 	layout() {
@@ -97,6 +119,10 @@ class HStack extends BaseView {
 		return this;
 	}
 
+	event(ev: UIEvent): boolean {
+		return false;
+	}
+
 	layout() {
 		// layout sub-views and calculate
 		// max height.
@@ -136,6 +162,8 @@ export class UI {
 		this.ctx.imageSmoothingEnabled = false;
 		let foo = loadImage("/sprite.png");
 		Promise.all([foo]).then(() => {
+			this.setupEventlisteners(canvas);
+
 			console.log("Loaded all assets");
 			let views = this.views;
 
@@ -151,6 +179,41 @@ export class UI {
 
 			requestAnimationFrame(() => this.draw());
 		});
+	}
+
+	setupEventlisteners(canvas: HTMLCanvasElement) {
+		let coords = (ev: MouseEvent) => {
+			let rect = canvas.getBoundingClientRect();
+			let x = ev.clientX - rect.left;
+			let y = ev.clientY - rect.top;
+			return { x: x, y: y };
+		}
+
+		let broadcastEvent = (ev: UIEvent) => {
+			console.log(ev);
+			for (var view of this.views) {
+				if (view.event(ev)) break;
+			}
+		}
+
+		var buttonDown = false;
+
+		canvas.addEventListener("mousedown", (ev) => {
+			let { x, y } = coords(ev);
+			buttonDown = true;
+			broadcastEvent({ type: "down", x: x, y: y });
+		}, true);
+
+		canvas.addEventListener("mousemove", (ev) => {
+			let { x, y } = coords(ev);
+			broadcastEvent({ type: buttonDown ? "dragged" : "moved", x: x, y: y });
+		}, true);
+
+		canvas.addEventListener("mouseup", (ev) => {
+			let { x, y } = coords(ev);
+			buttonDown = false;
+			broadcastEvent({ type: "up", x: x, y: y });
+		}, true);
 	}
 
 	draw() {

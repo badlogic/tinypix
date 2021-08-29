@@ -15,6 +15,9 @@
       this.width = width;
       this.height = height;
     }
+    event(event) {
+      throw new Error("Method not implemented.");
+    }
     layout() {
       throw new Error("Method not implemented.");
     }
@@ -26,6 +29,9 @@
     constructor(x, y, width, height, color) {
       super(x, y, width, height);
       this.color = color;
+    }
+    event(event) {
+      return false;
     }
     layout() {
     }
@@ -43,6 +49,9 @@
       this.views.push(view);
       this.layout();
       return this;
+    }
+    event(ev) {
+      return false;
     }
     layout() {
       let maxWidth = 0;
@@ -78,6 +87,9 @@
       this.layout();
       return this;
     }
+    event(ev) {
+      return false;
+    }
     layout() {
       let maxHeight = 0;
       for (var view of this.views) {
@@ -110,6 +122,7 @@
       this.ctx.imageSmoothingEnabled = false;
       let foo = loadImage("/sprite.png");
       Promise.all([foo]).then(() => {
+        this.setupEventlisteners(canvas2);
         console.log("Loaded all assets");
         let views = this.views;
         let tools = new VStack(0, 48);
@@ -122,6 +135,36 @@
         views.push(menu);
         requestAnimationFrame(() => this.draw());
       });
+    }
+    setupEventlisteners(canvas2) {
+      let coords = (ev) => {
+        let rect = canvas2.getBoundingClientRect();
+        let x = ev.clientX - rect.left;
+        let y = ev.clientY - rect.top;
+        return { x, y };
+      };
+      let broadcastEvent = (ev) => {
+        console.log(ev);
+        for (var view of this.views) {
+          if (view.event(ev))
+            break;
+        }
+      };
+      var buttonDown = false;
+      canvas2.addEventListener("mousedown", (ev) => {
+        let { x, y } = coords(ev);
+        buttonDown = true;
+        broadcastEvent({ type: "down", x, y });
+      }, true);
+      canvas2.addEventListener("mousemove", (ev) => {
+        let { x, y } = coords(ev);
+        broadcastEvent({ type: buttonDown ? "dragged" : "moved", x, y });
+      }, true);
+      canvas2.addEventListener("mouseup", (ev) => {
+        let { x, y } = coords(ev);
+        buttonDown = false;
+        broadcastEvent({ type: "up", x, y });
+      }, true);
     }
     draw() {
       requestAnimationFrame(() => this.draw());
