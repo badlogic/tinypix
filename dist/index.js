@@ -105,7 +105,7 @@
     }
   };
   var VStack = class extends BaseView {
-    constructor(x, y) {
+    constructor(x = 0, y = 0) {
       super(x, y, 0, 0);
       this.views = [];
     }
@@ -151,7 +151,7 @@
     }
   };
   var HStack = class extends BaseView {
-    constructor(x, y) {
+    constructor(x = 0, y = 0) {
       super(x, y, 0, 0);
       this.views = [];
     }
@@ -196,10 +196,43 @@
       ctx.restore();
     }
   };
+  var Aligner = class {
+    constructor(canvas2, view, alignment) {
+      this.canvas = canvas2;
+      this.view = view;
+      this.alignment = alignment;
+    }
+    align() {
+      let view = this.view;
+      let canvas2 = this.canvas;
+      switch (this.alignment.x) {
+        case "left":
+          view.x = 0;
+          break;
+        case "center":
+          view.x = (canvas2.clientWidth / 2 | 0) - (view.width / 2 | 0);
+          break;
+        case "right":
+          view.x = canvas2.clientWidth - view.width;
+      }
+      switch (this.alignment.y) {
+        case "top":
+          view.y = 0;
+          break;
+        case "center":
+          view.y = (canvas2.clientHeight / 2 | 0) - (view.height / 2 | 0);
+          break;
+        case "bottom":
+          view.y = canvas2.clientHeight - view.height;
+          break;
+      }
+    }
+  };
   var UI = class {
     constructor(canvas2) {
       this.canvas = canvas2;
       this.views = [];
+      this.aligners = [];
       this.ctx = canvas2.getContext("2d");
       this.ctx.imageSmoothingEnabled = false;
       requestAnimationFrame(() => this.draw());
@@ -233,8 +266,10 @@
         broadcastEvent(new EventMouse("up", x, y));
       }, true);
     }
-    add(view) {
+    add(view, alignment) {
       this.views.push(view);
+      if (alignment)
+        this.aligners.push(new Aligner(this.canvas, view, alignment));
     }
     draw() {
       requestAnimationFrame(() => this.draw());
@@ -252,6 +287,9 @@
       this.ctx.imageSmoothingEnabled = false;
       ctx.fillStyle = "gray";
       ctx.fillRect(0, 0, canvas2.width, canvas2.height);
+      for (var aligner of this.aligners) {
+        aligner.align();
+      }
       for (var view of this.views) {
         view.draw(ctx);
       }
@@ -265,17 +303,17 @@
       this.ui = new UI(canvas2);
       Promise.all([loadImage("/sprite.png")]).then((values) => {
         console.log("Loaded all assets");
-        let tools = new VStack(0, 48);
+        let tools = new VStack();
         tools.add(new ColorButton(0, 0, 48, 48, { hover: "red", noHover: "green" }, () => alert("Clicked red.")));
         let img = new ImageButton(0, 0, values[0], () => alert("Clicked image."));
         img.width = img.width * 4;
         img.height = img.height * 4;
         tools.add(img);
-        this.ui.add(tools);
-        let menu = new HStack(48, 0);
+        this.ui.add(tools, { x: "left", y: "center" });
+        let menu = new HStack();
         menu.add(new ColorButton(0, 0, 64, 64, "blue", () => alert("Clicked blue.")));
         menu.add(new ColorButton(0, 0, 48, 48, "yellow", () => alert("Clicked yellow.")));
-        this.ui.add(menu);
+        this.ui.add(menu, { x: "center", y: "top" });
       });
     }
   };

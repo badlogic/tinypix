@@ -108,7 +108,7 @@ export class ImageButton extends BaseButton {
 export class VStack extends BaseView {
 	private views: Array<View> = [];
 
-	constructor (x: number, y: number) {
+	constructor (x: number = 0, y: number = 0) {
 		super(x, y, 0, 0);
 	}
 
@@ -162,7 +162,7 @@ export class VStack extends BaseView {
 export class HStack extends BaseView {
 	private views: Array<View> = [];
 
-	constructor (x: number, y: number) {
+	constructor (x: number = 0, y: number = 0) {
 		super(x, y, 0, 0);
 	}
 
@@ -213,9 +213,35 @@ export class HStack extends BaseView {
 	}
 }
 
+type AlignmentX = "left" | "center" | "right";
+type AlignmentY = "top" | "center" | "bottom";
+interface Alignment { x: AlignmentX, y: AlignmentY };
+
+class Aligner {
+	constructor (private canvas: HTMLCanvasElement, private view: View, private alignment: Alignment) {
+	}
+
+	align() {
+		let view = this.view;
+		let canvas = this.canvas;
+		switch (this.alignment.x) {
+			case "left": view.x = 0; break;
+			case "center": view.x = ((canvas.clientWidth / 2) | 0) - ((view.width / 2) | 0); break;
+			case "right": view.x = canvas.clientWidth - view.width;
+		}
+
+		switch (this.alignment.y) {
+			case "top": view.y = 0; break;
+			case "center": view.y = ((canvas.clientHeight / 2) | 0) - ((view.height / 2) | 0); break;
+			case "bottom": view.y = canvas.clientHeight - view.height; break;
+		}
+	}
+}
+
 export class UI {
 	private ctx: CanvasRenderingContext2D;
 	private views: Array<View> = [];
+	private aligners: Array<Aligner> = [];
 
 	constructor (private canvas: HTMLCanvasElement) {
 		this.ctx = canvas.getContext("2d") as CanvasRenderingContext2D;
@@ -257,8 +283,9 @@ export class UI {
 		}, true);
 	}
 
-	add(view: View) {
+	add(view: View, alignment?: Alignment) {
 		this.views.push(view);
+		if (alignment) this.aligners.push(new Aligner(this.canvas, view, alignment));
 	}
 
 	draw() {
@@ -279,6 +306,10 @@ export class UI {
 		this.ctx.imageSmoothingEnabled = false;
 		ctx.fillStyle = "gray";
 		ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+		for (var aligner of this.aligners) {
+			aligner.align();
+		}
 
 		for (var view of this.views) {
 			view.draw(ctx);
