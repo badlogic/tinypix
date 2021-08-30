@@ -8,7 +8,7 @@ function loadImage(url: string): Promise<HTMLImageElement> {
 }
 
 class EventMouse {
-	constructor (public type: "down" | "moved" | "dragged" | "up", public x: number, public y: number) { }
+	constructor (public type: "down" | "moved" | "dragged" | "up" | "moved-global", public x: number, public y: number) { }
 
 	toLocal(x: number, y: number): EventMouse {
 		return new EventMouse(this.type, this.x - x, this.y - y);
@@ -44,13 +44,13 @@ class BaseView implements View {
 		throw new Error("Method not implemented.");
 	}
 
-	draw(ctx: CanvasRenderingContext2D): void {
+	draw(ctx: CanvasRenderingContext2D) {
 		throw new Error("Method not implemented.");
 	}
 }
 
-class Button extends BaseView {
-	constructor (x: number, y: number, width: number, height: number, public color: string, public onclick: () => void = () => { }) {
+class BaseButton extends BaseView {
+	constructor (x: number, y: number, width: number, height: number, public onclick: () => void = () => { }) {
 		super(x, y, width, height);
 	}
 
@@ -67,9 +67,42 @@ class Button extends BaseView {
 
 	layout() { }
 
-	draw(ctx: CanvasRenderingContext2D): void {
-		ctx.fillStyle = this.color;
+	draw(ctx: CanvasRenderingContext2D) {
+	}
+}
+
+class ColorButton extends BaseButton {
+	activeColor: string;
+
+	constructor (x: number, y: number, width: number, height: number, public color: string | { hover: string, noHover: string }, public onclick: () => void = () => { }) {
+		super(x, y, width, height);
+		if (typeof color === "string") this.activeColor = color;
+		else this.activeColor = color.hover;
+	}
+
+	event(ev: UIEvent): boolean {
+		if (ev instanceof EventMouse) {
+			if (ev.type === "moved-global" && typeof this.color !== "string") {
+				console.log(ev);
+				this.activeColor = this.inBounds(ev.x, ev.y) ? this.color.hover : this.color.noHover;
+			}
+		}
+		return super.event(ev);
+	}
+
+	draw(ctx: CanvasRenderingContext2D) {
+		ctx.fillStyle = this.activeColor;
 		ctx.fillRect(this.x, this.y, this.width, this.height);
+	}
+}
+
+class ImageButton extends BaseButton {
+	constructor (x: number, y: number, public image: HTMLImageElement, public onclick: () => void = () => { }) {
+		super(x, y, image.width, image.height);
+	}
+
+	draw(ctx: CanvasRenderingContext2D) {
+		ctx.drawImage(this.image, this.x, this.y, this.width, this.height);
 	}
 }
 
@@ -88,7 +121,7 @@ class VStack extends BaseView {
 
 	event(ev: UIEvent): boolean {
 		if (ev instanceof EventMouse) {
-			if (!this.inBounds(ev.x, ev.y)) return false;
+			if (ev.type != "moved-global" && !this.inBounds(ev.x, ev.y)) return false;
 			ev = ev.toLocal(this.x, this.y);
 		}
 		for (var view of this.views) {
@@ -118,7 +151,7 @@ class VStack extends BaseView {
 		}
 	}
 
-	draw(ctx: CanvasRenderingContext2D): void {
+	draw(ctx: CanvasRenderingContext2D) {
 		ctx.save();
 		ctx.translate(this.x, this.y);
 		for (var view of this.views)
@@ -142,7 +175,7 @@ class HStack extends BaseView {
 
 	event(ev: UIEvent): boolean {
 		if (ev instanceof EventMouse) {
-			if (!this.inBounds(ev.x, ev.y)) return false;
+			if (ev.type != "moved-global" && !this.inBounds(ev.x, ev.y)) return false;
 			ev = ev.toLocal(this.x, this.y);
 		}
 		for (var view of this.views) {
@@ -172,7 +205,7 @@ class HStack extends BaseView {
 		}
 	}
 
-	draw(ctx: CanvasRenderingContext2D): void {
+	draw(ctx: CanvasRenderingContext2D) {
 		ctx.save();
 		ctx.translate(this.x, this.y);
 		for (var view of this.views)
@@ -189,20 +222,23 @@ export class UI {
 		this.ctx = canvas.getContext("2d") as CanvasRenderingContext2D;
 		this.ctx.imageSmoothingEnabled = false;
 		let foo = loadImage("/sprite.png");
-		Promise.all([foo]).then(() => {
+		Promise.all([foo]).then((values) => {
 			this.setupInput(canvas);
 
 			console.log("Loaded all assets");
 			let views = this.views;
 
 			let tools = new VStack(0, 48);
-			tools.add(new Button(0, 0, 48, 48, "red", () => alert("Clicked red.")));
-			tools.add(new Button(0, 0, 48, 48, "green", () => alert("Clicked green.")));
+			tools.add(new ColorButton(0, 0, 48, 48, { hover: "red", noHover: "green" }, () => alert("Clicked red.")));
+			let img = new ImageButton(0, 0, values[0] as HTMLImageElement, () => alert("Clicked image."))
+			img.width = img.width * 4;
+			img.height = img.height * 4;
+			tools.add(img);
 			views.push(tools);
 
 			let menu = new HStack(48, 0);
-			menu.add(new Button(0, 0, 64, 64, "blue", () => alert("Clicked blue.")));
-			menu.add(new Button(0, 0, 48, 48, "yellow", () => alert("Clicked yellow.")));
+			menu.add(new ColorButton(0, 0, 64, 64, "blue", () => alert("Clicked blue.")));
+			menu.add(new ColorButton(0, 0, 48, 48, "yellow", () => alert("Clicked yellow.")));
 			views.push(menu);
 
 			requestAnimationFrame(() => this.draw());
@@ -235,6 +271,7 @@ export class UI {
 		canvas.addEventListener("mousemove", (ev) => {
 			let { x, y } = coords(ev);
 			broadcastEvent(new EventMouse(buttonDown ? "dragged" : "moved", x, y));
+			broadcastEvent(new EventMouse("moved-global", x, y));
 		}, true);
 
 		canvas.addEventListener("mouseup", (ev) => {
@@ -259,6 +296,7 @@ export class UI {
 		let ctx = this.ctx;
 		ctx.save();
 		ctx.scale(dpr, dpr);
+		this.ctx.imageSmoothingEnabled = false;
 		ctx.fillStyle = "gray";
 		ctx.fillRect(0, 0, canvas.width, canvas.height);
 

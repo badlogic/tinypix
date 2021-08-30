@@ -38,11 +38,10 @@
       throw new Error("Method not implemented.");
     }
   };
-  var Button = class extends BaseView {
-    constructor(x, y, width, height, color, onclick = () => {
+  var BaseButton = class extends BaseView {
+    constructor(x, y, width, height, onclick = () => {
     }) {
       super(x, y, width, height);
-      this.color = color;
       this.onclick = onclick;
     }
     event(event) {
@@ -59,8 +58,42 @@
     layout() {
     }
     draw(ctx) {
-      ctx.fillStyle = this.color;
+    }
+  };
+  var ColorButton = class extends BaseButton {
+    constructor(x, y, width, height, color, onclick = () => {
+    }) {
+      super(x, y, width, height);
+      this.color = color;
+      this.onclick = onclick;
+      if (typeof color === "string")
+        this.activeColor = color;
+      else
+        this.activeColor = color.hover;
+    }
+    event(ev) {
+      if (ev instanceof EventMouse) {
+        if (ev.type === "moved-global" && typeof this.color !== "string") {
+          console.log(ev);
+          this.activeColor = this.inBounds(ev.x, ev.y) ? this.color.hover : this.color.noHover;
+        }
+      }
+      return super.event(ev);
+    }
+    draw(ctx) {
+      ctx.fillStyle = this.activeColor;
       ctx.fillRect(this.x, this.y, this.width, this.height);
+    }
+  };
+  var ImageButton = class extends BaseButton {
+    constructor(x, y, image, onclick = () => {
+    }) {
+      super(x, y, image.width, image.height);
+      this.image = image;
+      this.onclick = onclick;
+    }
+    draw(ctx) {
+      ctx.drawImage(this.image, this.x, this.y, this.width, this.height);
     }
   };
   var VStack = class extends BaseView {
@@ -75,7 +108,7 @@
     }
     event(ev) {
       if (ev instanceof EventMouse) {
-        if (!this.inBounds(ev.x, ev.y))
+        if (ev.type != "moved-global" && !this.inBounds(ev.x, ev.y))
           return false;
         ev = ev.toLocal(this.x, this.y);
       }
@@ -121,7 +154,7 @@
     }
     event(ev) {
       if (ev instanceof EventMouse) {
-        if (!this.inBounds(ev.x, ev.y))
+        if (ev.type != "moved-global" && !this.inBounds(ev.x, ev.y))
           return false;
         ev = ev.toLocal(this.x, this.y);
       }
@@ -162,17 +195,20 @@
       this.ctx = canvas2.getContext("2d");
       this.ctx.imageSmoothingEnabled = false;
       let foo = loadImage("/sprite.png");
-      Promise.all([foo]).then(() => {
+      Promise.all([foo]).then((values) => {
         this.setupInput(canvas2);
         console.log("Loaded all assets");
         let views = this.views;
         let tools = new VStack(0, 48);
-        tools.add(new Button(0, 0, 48, 48, "red", () => alert("Clicked red.")));
-        tools.add(new Button(0, 0, 48, 48, "green", () => alert("Clicked green.")));
+        tools.add(new ColorButton(0, 0, 48, 48, { hover: "red", noHover: "green" }, () => alert("Clicked red.")));
+        let img = new ImageButton(0, 0, values[0], () => alert("Clicked image."));
+        img.width = img.width * 4;
+        img.height = img.height * 4;
+        tools.add(img);
         views.push(tools);
         let menu = new HStack(48, 0);
-        menu.add(new Button(0, 0, 64, 64, "blue", () => alert("Clicked blue.")));
-        menu.add(new Button(0, 0, 48, 48, "yellow", () => alert("Clicked yellow.")));
+        menu.add(new ColorButton(0, 0, 64, 64, "blue", () => alert("Clicked blue.")));
+        menu.add(new ColorButton(0, 0, 48, 48, "yellow", () => alert("Clicked yellow.")));
         views.push(menu);
         requestAnimationFrame(() => this.draw());
       });
@@ -200,6 +236,7 @@
       canvas2.addEventListener("mousemove", (ev) => {
         let { x, y } = coords(ev);
         broadcastEvent(new EventMouse(buttonDown ? "dragged" : "moved", x, y));
+        broadcastEvent(new EventMouse("moved-global", x, y));
       }, true);
       canvas2.addEventListener("mouseup", (ev) => {
         let { x, y } = coords(ev);
@@ -220,6 +257,7 @@
       let ctx = this.ctx;
       ctx.save();
       ctx.scale(dpr, dpr);
+      this.ctx.imageSmoothingEnabled = false;
       ctx.fillStyle = "gray";
       ctx.fillRect(0, 0, canvas2.width, canvas2.height);
       for (var view of this.views) {
