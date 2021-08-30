@@ -7,10 +7,12 @@ function loadImage(url: string): Promise<HTMLImageElement> {
 	});
 }
 
-interface EventMouse {
-	type: "down" | "moved" | "dragged" | "up";
-	x: number,
-	y: number
+class EventMouse {
+	constructor (public type: "down" | "moved" | "dragged" | "up", public x: number, public y: number) { }
+
+	toLocal(x: number, y: number): EventMouse {
+		return new EventMouse(this.type, this.x - x, this.y - y);
+	}
 }
 
 type UIEvent = EventMouse;
@@ -27,6 +29,13 @@ class BaseView implements View {
 	constructor (public x: number, public y: number, public width: number, public height: number) {
 	}
 
+	inBounds(x: number, y: number): boolean {
+		return this.x <= x &&
+			this.y <= y &&
+			this.x + this.width > x &&
+			this.y + this.height > y;
+	}
+
 	event(event: UIEvent): boolean {
 		throw new Error("Method not implemented.");
 	}
@@ -38,15 +47,21 @@ class BaseView implements View {
 	draw(ctx: CanvasRenderingContext2D): void {
 		throw new Error("Method not implemented.");
 	}
-
 }
 
 class Button extends BaseView {
-	constructor (x: number, y: number, width: number, height: number, public color: string) {
+	constructor (x: number, y: number, width: number, height: number, public color: string, public onclick: () => void = () => { }) {
 		super(x, y, width, height);
 	}
 
 	event(event: UIEvent): boolean {
+		if (event instanceof EventMouse) {
+			if (!this.inBounds(event.x, event.y)) return false;
+			if (event.type === "up" && this.onclick) {
+				this.onclick();
+				return true;
+			}
+		}
 		return false;
 	}
 
@@ -56,7 +71,6 @@ class Button extends BaseView {
 		ctx.fillStyle = this.color;
 		ctx.fillRect(this.x, this.y, this.width, this.height);
 	}
-
 }
 
 class VStack extends BaseView {
@@ -73,6 +87,13 @@ class VStack extends BaseView {
 	}
 
 	event(ev: UIEvent): boolean {
+		if (ev instanceof EventMouse) {
+			if (!this.inBounds(ev.x, ev.y)) return false;
+			ev = ev.toLocal(this.x, this.y);
+		}
+		for (var view of this.views) {
+			if (view.event(ev)) return true;
+		}
 		return false;
 	}
 
@@ -120,6 +141,13 @@ class HStack extends BaseView {
 	}
 
 	event(ev: UIEvent): boolean {
+		if (ev instanceof EventMouse) {
+			if (!this.inBounds(ev.x, ev.y)) return false;
+			ev = ev.toLocal(this.x, this.y);
+		}
+		for (var view of this.views) {
+			if (view.event(ev)) return true;
+		}
 		return false;
 	}
 
@@ -162,26 +190,26 @@ export class UI {
 		this.ctx.imageSmoothingEnabled = false;
 		let foo = loadImage("/sprite.png");
 		Promise.all([foo]).then(() => {
-			this.setupEventlisteners(canvas);
+			this.setupInput(canvas);
 
 			console.log("Loaded all assets");
 			let views = this.views;
 
 			let tools = new VStack(0, 48);
-			tools.add(new Button(0, 0, 48, 48, "red"));
-			tools.add(new Button(0, 0, 48, 48, "green"));
+			tools.add(new Button(0, 0, 48, 48, "red", () => alert("Clicked red.")));
+			tools.add(new Button(0, 0, 48, 48, "green", () => alert("Clicked green.")));
 			views.push(tools);
 
 			let menu = new HStack(48, 0);
-			menu.add(new Button(0, 0, 64, 64, "blue"));
-			menu.add(new Button(0, 0, 48, 48, "yellow"));
+			menu.add(new Button(0, 0, 64, 64, "blue", () => alert("Clicked blue.")));
+			menu.add(new Button(0, 0, 48, 48, "yellow", () => alert("Clicked yellow.")));
 			views.push(menu);
 
 			requestAnimationFrame(() => this.draw());
 		});
 	}
 
-	setupEventlisteners(canvas: HTMLCanvasElement) {
+	setupInput(canvas: HTMLCanvasElement) {
 		let coords = (ev: MouseEvent) => {
 			let rect = canvas.getBoundingClientRect();
 			let x = ev.clientX - rect.left;
@@ -201,18 +229,18 @@ export class UI {
 		canvas.addEventListener("mousedown", (ev) => {
 			let { x, y } = coords(ev);
 			buttonDown = true;
-			broadcastEvent({ type: "down", x: x, y: y });
+			broadcastEvent(new EventMouse("down", x, y));
 		}, true);
 
 		canvas.addEventListener("mousemove", (ev) => {
 			let { x, y } = coords(ev);
-			broadcastEvent({ type: buttonDown ? "dragged" : "moved", x: x, y: y });
+			broadcastEvent(new EventMouse(buttonDown ? "dragged" : "moved", x, y));
 		}, true);
 
 		canvas.addEventListener("mouseup", (ev) => {
 			let { x, y } = coords(ev);
 			buttonDown = false;
-			broadcastEvent({ type: "up", x: x, y: y });
+			broadcastEvent(new EventMouse("up", x, y));
 		}, true);
 	}
 

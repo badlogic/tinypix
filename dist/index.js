@@ -8,12 +8,25 @@
       img.src = url;
     });
   }
+  var EventMouse = class {
+    constructor(type, x, y) {
+      this.type = type;
+      this.x = x;
+      this.y = y;
+    }
+    toLocal(x, y) {
+      return new EventMouse(this.type, this.x - x, this.y - y);
+    }
+  };
   var BaseView = class {
     constructor(x, y, width, height) {
       this.x = x;
       this.y = y;
       this.width = width;
       this.height = height;
+    }
+    inBounds(x, y) {
+      return this.x <= x && this.y <= y && this.x + this.width > x && this.y + this.height > y;
     }
     event(event) {
       throw new Error("Method not implemented.");
@@ -26,11 +39,21 @@
     }
   };
   var Button = class extends BaseView {
-    constructor(x, y, width, height, color) {
+    constructor(x, y, width, height, color, onclick = () => {
+    }) {
       super(x, y, width, height);
       this.color = color;
+      this.onclick = onclick;
     }
     event(event) {
+      if (event instanceof EventMouse) {
+        if (!this.inBounds(event.x, event.y))
+          return false;
+        if (event.type === "up" && this.onclick) {
+          this.onclick();
+          return true;
+        }
+      }
       return false;
     }
     layout() {
@@ -51,6 +74,15 @@
       return this;
     }
     event(ev) {
+      if (ev instanceof EventMouse) {
+        if (!this.inBounds(ev.x, ev.y))
+          return false;
+        ev = ev.toLocal(this.x, this.y);
+      }
+      for (var view of this.views) {
+        if (view.event(ev))
+          return true;
+      }
       return false;
     }
     layout() {
@@ -88,6 +120,15 @@
       return this;
     }
     event(ev) {
+      if (ev instanceof EventMouse) {
+        if (!this.inBounds(ev.x, ev.y))
+          return false;
+        ev = ev.toLocal(this.x, this.y);
+      }
+      for (var view of this.views) {
+        if (view.event(ev))
+          return true;
+      }
       return false;
     }
     layout() {
@@ -122,21 +163,21 @@
       this.ctx.imageSmoothingEnabled = false;
       let foo = loadImage("/sprite.png");
       Promise.all([foo]).then(() => {
-        this.setupEventlisteners(canvas2);
+        this.setupInput(canvas2);
         console.log("Loaded all assets");
         let views = this.views;
         let tools = new VStack(0, 48);
-        tools.add(new Button(0, 0, 48, 48, "red"));
-        tools.add(new Button(0, 0, 48, 48, "green"));
+        tools.add(new Button(0, 0, 48, 48, "red", () => alert("Clicked red.")));
+        tools.add(new Button(0, 0, 48, 48, "green", () => alert("Clicked green.")));
         views.push(tools);
         let menu = new HStack(48, 0);
-        menu.add(new Button(0, 0, 64, 64, "blue"));
-        menu.add(new Button(0, 0, 48, 48, "yellow"));
+        menu.add(new Button(0, 0, 64, 64, "blue", () => alert("Clicked blue.")));
+        menu.add(new Button(0, 0, 48, 48, "yellow", () => alert("Clicked yellow.")));
         views.push(menu);
         requestAnimationFrame(() => this.draw());
       });
     }
-    setupEventlisteners(canvas2) {
+    setupInput(canvas2) {
       let coords = (ev) => {
         let rect = canvas2.getBoundingClientRect();
         let x = ev.clientX - rect.left;
@@ -154,16 +195,16 @@
       canvas2.addEventListener("mousedown", (ev) => {
         let { x, y } = coords(ev);
         buttonDown = true;
-        broadcastEvent({ type: "down", x, y });
+        broadcastEvent(new EventMouse("down", x, y));
       }, true);
       canvas2.addEventListener("mousemove", (ev) => {
         let { x, y } = coords(ev);
-        broadcastEvent({ type: buttonDown ? "dragged" : "moved", x, y });
+        broadcastEvent(new EventMouse(buttonDown ? "dragged" : "moved", x, y));
       }, true);
       canvas2.addEventListener("mouseup", (ev) => {
         let { x, y } = coords(ev);
         buttonDown = false;
-        broadcastEvent({ type: "up", x, y });
+        broadcastEvent(new EventMouse("up", x, y));
       }, true);
     }
     draw() {
