@@ -1,13 +1,5 @@
-function loadImage(url: string): Promise<HTMLImageElement> {
-	return new Promise<HTMLImageElement>((resolve, reject) => {
-		let img = new Image();
-		img.onload = () => resolve(img);
-		img.onerror = reject;
-		img.src = url;
-	});
-}
 
-class EventMouse {
+export class EventMouse {
 	constructor (public type: "down" | "moved" | "dragged" | "up" | "moved-global", public x: number, public y: number) { }
 
 	toLocal(x: number, y: number): EventMouse {
@@ -15,9 +7,9 @@ class EventMouse {
 	}
 }
 
-type UIEvent = EventMouse;
+export type UIEvent = EventMouse;
 
-interface View {
+export interface View {
 	x: number, y: number, width: number, height: number;
 
 	event(event: UIEvent): boolean;
@@ -25,7 +17,7 @@ interface View {
 	draw(ctx: CanvasRenderingContext2D): void;
 }
 
-class BaseView implements View {
+export class BaseView implements View {
 	constructor (public x: number, public y: number, public width: number, public height: number) {
 	}
 
@@ -49,7 +41,7 @@ class BaseView implements View {
 	}
 }
 
-class BaseButton extends BaseView {
+export class BaseButton extends BaseView {
 	constructor (x: number, y: number, width: number, height: number, public onclick: () => void = () => { }) {
 		super(x, y, width, height);
 	}
@@ -71,8 +63,8 @@ class BaseButton extends BaseView {
 	}
 }
 
-class ColorButton extends BaseButton {
-	activeColor: string;
+export class ColorButton extends BaseButton {
+	protected activeColor: string;
 
 	constructor (x: number, y: number, width: number, height: number, public color: string | { hover: string, noHover: string }, public onclick: () => void = () => { }) {
 		super(x, y, width, height);
@@ -96,9 +88,16 @@ class ColorButton extends BaseButton {
 	}
 }
 
-class ImageButton extends BaseButton {
-	constructor (x: number, y: number, public image: HTMLImageElement, public onclick: () => void = () => { }) {
-		super(x, y, image.width, image.height);
+export class ImageButton extends BaseButton {
+	constructor (x: number, y: number, protected image: HTMLImageElement, public onclick: () => void = () => { }) {
+		super(x, y, 0, 0);
+		this.setImage(image);
+	}
+
+	setImage(image: HTMLImageElement) {
+		this.image = image;
+		this.width = image.width;
+		this.height = image.height;
 	}
 
 	draw(ctx: CanvasRenderingContext2D) {
@@ -106,7 +105,7 @@ class ImageButton extends BaseButton {
 	}
 }
 
-class VStack extends BaseView {
+export class VStack extends BaseView {
 	private views: Array<View> = [];
 
 	constructor (x: number, y: number) {
@@ -160,7 +159,7 @@ class VStack extends BaseView {
 	}
 }
 
-class HStack extends BaseView {
+export class HStack extends BaseView {
 	private views: Array<View> = [];
 
 	constructor (x: number, y: number) {
@@ -215,37 +214,14 @@ class HStack extends BaseView {
 }
 
 export class UI {
-	readonly ctx: CanvasRenderingContext2D;
-	views: Array<View> = [];
+	private ctx: CanvasRenderingContext2D;
+	private views: Array<View> = [];
 
-	constructor (readonly canvas: HTMLCanvasElement) {
+	constructor (private canvas: HTMLCanvasElement) {
 		this.ctx = canvas.getContext("2d") as CanvasRenderingContext2D;
 		this.ctx.imageSmoothingEnabled = false;
-		let foo = loadImage("/sprite.png");
-		Promise.all([foo]).then((values) => {
-			this.setupInput(canvas);
+		requestAnimationFrame(() => this.draw());
 
-			console.log("Loaded all assets");
-			let views = this.views;
-
-			let tools = new VStack(0, 48);
-			tools.add(new ColorButton(0, 0, 48, 48, { hover: "red", noHover: "green" }, () => alert("Clicked red.")));
-			let img = new ImageButton(0, 0, values[0] as HTMLImageElement, () => alert("Clicked image."))
-			img.width = img.width * 4;
-			img.height = img.height * 4;
-			tools.add(img);
-			views.push(tools);
-
-			let menu = new HStack(48, 0);
-			menu.add(new ColorButton(0, 0, 64, 64, "blue", () => alert("Clicked blue.")));
-			menu.add(new ColorButton(0, 0, 48, 48, "yellow", () => alert("Clicked yellow.")));
-			views.push(menu);
-
-			requestAnimationFrame(() => this.draw());
-		});
-	}
-
-	setupInput(canvas: HTMLCanvasElement) {
 		let coords = (ev: MouseEvent) => {
 			let rect = canvas.getBoundingClientRect();
 			let x = ev.clientX - rect.left;
@@ -279,6 +255,10 @@ export class UI {
 			buttonDown = false;
 			broadcastEvent(new EventMouse("up", x, y));
 		}, true);
+	}
+
+	add(view: View) {
+		this.views.push(view);
 	}
 
 	draw() {

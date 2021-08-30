@@ -1,4 +1,4 @@
-import { UI } from "./ui";
+import { App } from "./app";
 
 let canvas = document.getElementById("screen") as HTMLCanvasElement;
-new UI(canvas);
+new App(canvas);

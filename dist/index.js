@@ -1,5 +1,5 @@
 (() => {
-  // src/ui.ts
+  // src/io.ts
   function loadImage(url) {
     return new Promise((resolve, reject) => {
       let img = new Image();
@@ -8,6 +8,8 @@
       img.src = url;
     });
   }
+
+  // src/ui.ts
   var EventMouse = class {
     constructor(type, x, y) {
       this.type = type;
@@ -88,9 +90,15 @@
   var ImageButton = class extends BaseButton {
     constructor(x, y, image, onclick = () => {
     }) {
-      super(x, y, image.width, image.height);
+      super(x, y, 0, 0);
       this.image = image;
       this.onclick = onclick;
+      this.setImage(image);
+    }
+    setImage(image) {
+      this.image = image;
+      this.width = image.width;
+      this.height = image.height;
     }
     draw(ctx) {
       ctx.drawImage(this.image, this.x, this.y, this.width, this.height);
@@ -194,26 +202,7 @@
       this.views = [];
       this.ctx = canvas2.getContext("2d");
       this.ctx.imageSmoothingEnabled = false;
-      let foo = loadImage("/sprite.png");
-      Promise.all([foo]).then((values) => {
-        this.setupInput(canvas2);
-        console.log("Loaded all assets");
-        let views = this.views;
-        let tools = new VStack(0, 48);
-        tools.add(new ColorButton(0, 0, 48, 48, { hover: "red", noHover: "green" }, () => alert("Clicked red.")));
-        let img = new ImageButton(0, 0, values[0], () => alert("Clicked image."));
-        img.width = img.width * 4;
-        img.height = img.height * 4;
-        tools.add(img);
-        views.push(tools);
-        let menu = new HStack(48, 0);
-        menu.add(new ColorButton(0, 0, 64, 64, "blue", () => alert("Clicked blue.")));
-        menu.add(new ColorButton(0, 0, 48, 48, "yellow", () => alert("Clicked yellow.")));
-        views.push(menu);
-        requestAnimationFrame(() => this.draw());
-      });
-    }
-    setupInput(canvas2) {
+      requestAnimationFrame(() => this.draw());
       let coords = (ev) => {
         let rect = canvas2.getBoundingClientRect();
         let x = ev.clientX - rect.left;
@@ -244,6 +233,9 @@
         broadcastEvent(new EventMouse("up", x, y));
       }, true);
     }
+    add(view) {
+      this.views.push(view);
+    }
     draw() {
       requestAnimationFrame(() => this.draw());
       let canvas2 = this.canvas;
@@ -267,8 +259,29 @@
     }
   };
 
+  // src/app.ts
+  var App = class {
+    constructor(canvas2) {
+      this.ui = new UI(canvas2);
+      Promise.all([loadImage("/sprite.png")]).then((values) => {
+        console.log("Loaded all assets");
+        let tools = new VStack(0, 48);
+        tools.add(new ColorButton(0, 0, 48, 48, { hover: "red", noHover: "green" }, () => alert("Clicked red.")));
+        let img = new ImageButton(0, 0, values[0], () => alert("Clicked image."));
+        img.width = img.width * 4;
+        img.height = img.height * 4;
+        tools.add(img);
+        this.ui.add(tools);
+        let menu = new HStack(48, 0);
+        menu.add(new ColorButton(0, 0, 64, 64, "blue", () => alert("Clicked blue.")));
+        menu.add(new ColorButton(0, 0, 48, 48, "yellow", () => alert("Clicked yellow.")));
+        this.ui.add(menu);
+      });
+    }
+  };
+
   // src/tinypix.ts
   var canvas = document.getElementById("screen");
-  new UI(canvas);
+  new App(canvas);
 })();
 //# sourceMappingURL=index.js.map
