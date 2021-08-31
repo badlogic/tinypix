@@ -1,18 +1,34 @@
 
 export class EventMouse {
-	constructor (public type: "down" | "moved" | "dragged" | "up" | "moved-global", public x: number, public y: number) { }
+	constructor (public type: "down" | "moved" | "dragged" | "up" | "moved-global", public x: number, public y: number) {
+	}
 
 	toLocal(x: number, y: number): EventMouse {
 		return new EventMouse(this.type, this.x - x, this.y - y);
 	}
 }
 
-export type UIEvent = EventMouse;
+export class EventKey {
 
-export interface View {
+}
+
+export class EventPan {
+	constructor (public deltaX: number, public deltaY: number, public x: number, public y: number) { }
+}
+
+export class EventZoom {
+	constructor (public zoom: number, public x: number, public y: number) { }
+}
+
+export type UIEvent = EventMouse | EventZoom | EventPan;
+
+export interface UIEventListener {
+	event(event: UIEvent): boolean;
+}
+
+export interface View extends UIEventListener {
 	x: number, y: number, width: number, height: number;
 
-	event(event: UIEvent): boolean;
 	layout(): void;
 	draw(ctx: CanvasRenderingContext2D): void;
 }
@@ -29,30 +45,41 @@ export class BaseView implements View {
 	}
 
 	event(event: UIEvent): boolean {
-		throw new Error("Method not implemented.");
+		return false;
 	}
 
 	layout() {
-		throw new Error("Method not implemented.");
 	}
 
 	draw(ctx: CanvasRenderingContext2D) {
-		throw new Error("Method not implemented.");
 	}
 }
 
 export class BaseButton extends BaseView {
+	mouseDown: boolean = false;
+
 	constructor (x: number, y: number, width: number, height: number, public onclick: () => void = () => { }) {
 		super(x, y, width, height);
 	}
 
 	event(event: UIEvent): boolean {
 		if (event instanceof EventMouse) {
-			if (!this.inBounds(event.x, event.y)) return false;
-			if (event.type === "up" && this.onclick) {
-				this.onclick();
-				return true;
+			let inBounds = this.inBounds(event.x, event.y);
+			if (!inBounds) {
+				this.mouseDown = false;
+				return false;
 			}
+
+			if (event.type === "down") {
+				this.mouseDown = true;
+			}
+
+			if (event.type === "up" && this.mouseDown) {
+				this.mouseDown = false;
+				if (this.inBounds(event.x, event.y) && this.onclick) this.onclick();
+			}
+
+			return true;
 		}
 		return false;
 	}
@@ -69,13 +96,12 @@ export class ColorButton extends BaseButton {
 	constructor (x: number, y: number, width: number, height: number, public color: string | { hover: string, noHover: string }, public onclick: () => void = () => { }) {
 		super(x, y, width, height);
 		if (typeof color === "string") this.activeColor = color;
-		else this.activeColor = color.hover;
+		else this.activeColor = color.noHover;
 	}
 
 	event(ev: UIEvent): boolean {
 		if (ev instanceof EventMouse) {
 			if (ev.type === "moved-global" && typeof this.color !== "string") {
-				console.log(ev);
 				this.activeColor = this.inBounds(ev.x, ev.y) ? this.color.hover : this.color.noHover;
 			}
 		}
@@ -213,6 +239,12 @@ export class HStack extends BaseView {
 	}
 }
 
+export class Spacer extends BaseView {
+	constructor (width: number, height: number) {
+		super(0, 0, width, height);
+	}
+}
+
 type AlignmentX = "left" | "center" | "right";
 type AlignmentY = "top" | "center" | "bottom";
 interface Alignment { x: AlignmentX, y: AlignmentY };
@@ -242,6 +274,7 @@ export class UI {
 	private ctx: CanvasRenderingContext2D;
 	private views: Array<View> = [];
 	private aligners: Array<Aligner> = [];
+	private eventListeners: Array<UIEventListener> = [];
 
 	constructor (private canvas: HTMLCanvasElement) {
 		this.ctx = canvas.getContext("2d") as CanvasRenderingContext2D;
@@ -256,31 +289,47 @@ export class UI {
 		}
 
 		let broadcastEvent = (ev: UIEvent) => {
-			console.log(ev);
-			for (var view of this.views) {
-				if (view.event(ev)) break;
+			// Broadcast event in reverse view draw order.
+			// The view added last will first receive the UI event.
+			for (var i = this.views.length - 1; i >= 0; i--) {
+				let view = this.views[i];
+				if (view.event(ev)) return;
 			}
 		}
 
 		var buttonDown = false;
+		var lastX = 0, lastY = 0;
 
 		canvas.addEventListener("mousedown", (ev) => {
 			let { x, y } = coords(ev);
+			lastX = x; lastY = y;
 			buttonDown = true;
 			broadcastEvent(new EventMouse("down", x, y));
 		}, true);
 
 		canvas.addEventListener("mousemove", (ev) => {
 			let { x, y } = coords(ev);
+			lastX = x; lastY = y;
 			broadcastEvent(new EventMouse(buttonDown ? "dragged" : "moved", x, y));
 			broadcastEvent(new EventMouse("moved-global", x, y));
 		}, true);
 
 		canvas.addEventListener("mouseup", (ev) => {
 			let { x, y } = coords(ev);
+			lastX = x; lastY = y;
 			buttonDown = false;
 			broadcastEvent(new EventMouse("up", x, y));
+			broadcastEvent(new EventMouse("up-global", x, y));
 		}, true);
+
+		canvas.addEventListener("wheel", (ev) => {
+			ev.preventDefault();
+			// Everything is fucking terrible https://dev.to/danburzo/pinch-me-i-m-zooming-gestures-in-the-dom-a0e
+			if (ev.ctrlKey) // <----- WTFFFFFFFFFFFFFF
+				broadcastEvent(new EventZoom(ev.deltaY, lastX, lastY));
+			else
+				broadcastEvent(new EventPan(ev.deltaX, ev.deltaY, lastX, lastY));
+		})
 	}
 
 	add(view: View, alignment?: Alignment) {
@@ -304,8 +353,6 @@ export class UI {
 		ctx.save();
 		ctx.scale(dpr, dpr);
 		this.ctx.imageSmoothingEnabled = false;
-		ctx.fillStyle = "gray";
-		ctx.fillRect(0, 0, canvas.width, canvas.height);
 
 		for (var aligner of this.aligners) {
 			aligner.align();

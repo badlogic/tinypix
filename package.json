@@ -5,7 +5,7 @@
   "main": "index.js",
   "scripts": {
     "dev": "concurrently \"npm run build -- --watch\" \"npx live-server --no-browser dist\"",
-    "build": "npx esbuild src/tinypix.ts --minify --bundle --sourcemap --outfile=dist/index.js"
+    "build": "npx esbuild src/tinypix.ts --bundle --sourcemap --outfile=dist/index.js"
   },
   "repository": {
     "type": "git",
